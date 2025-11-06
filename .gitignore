@@ -1,36 +1,3 @@
-# Ignore everything by default
 *
-
-# Allow directory traversal so we can unignore files inside
 !*/
-
-# Keep Python source files and common metadata
 !*.py
-!.gitignore
-!README*
-!LICENSE*
-!requirements*.txt
-
-# Python caches and build outputs
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-.Python
-
-# Virtual environments
-.env
-.venv
-venv/
-ENV/
-
-# Packaging
-build/
-dist/
-*.egg-info/
-
-# Jupyter checkpoints
-.ipynb_checkpoints/
-
-# macOS metadata
-.DS_Store
