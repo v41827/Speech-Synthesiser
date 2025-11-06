@@ -27,7 +27,7 @@ def compute_lpc(audio_path=AUDIO_PATH, order=DEFAULT_ORDER):
     print(type(y))
     y = np.asarray(y, dtype=float).flatten()
     print("Audio type after conversion:", type(y))
-    y = y - np.mean(y) # remove DC offset
+    y = y - np.mean(y) # remove DC offset, optional
 
     # --- windowing for spectrum ---
     #win = get_window('hamming', len(y), fftbins=True)
@@ -81,7 +81,7 @@ def compute_lpc(audio_path=AUDIO_PATH, order=DEFAULT_ORDER):
     }
 
 # ❶ 匯入的時候就先算好給別人用（你 synth 要用）
-try:
+try: #comment out now when plotting, to avoid printing unrealted stuff in the terminal
     _result = compute_lpc()
     a = _result["a"]
     F0_mean = _result["F0_mean"]
