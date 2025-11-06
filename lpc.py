@@ -186,12 +186,106 @@ def plot_lpc_for_folder(folder_path, order=DEFAULT_ORDER, save=True, show=False,
             try:
                 result = compute_lpc(audio_path=fpath, order=order)
                 plot_lpc_result(result, save=save, show=show, out_dir=out_dir)
+                if args.pz:
+                    plot_pz_from_a(result["a"], result["fs"], result["order"], result["audio_path"], save=not args.nosave, show=args.show, out_dir=args.outdir)
             except Exception as e:
                 print(f"Error processing {fpath}: {e}")
 
 def plot_figure(_result=_result):
     # Backward compatibility: keep original plot_figure signature
     plot_lpc_result(_result, out_dir=None)
+
+def draw_circle():
+    pass  # existing helper function placeholder
+
+def draw_freq_db_circle():
+    pass  # existing helper function placeholder
+
+def plot_pz_from_a(a, fs, order, audio_path, save=True, show=False, out_dir=None):
+    """
+    Make a separate pole plot with the unit circle.
+    - a: LPC denominator coefficients (a[0] ~ 1)
+    - fs: sampling rate (for context in title)
+    - order: LPC order (for title/filename)
+    - audio_path: used to name the output
+    """
+    try:
+        roots = np.roots(a) if a is not None else np.array([])
+    except Exception as e:
+        print(f"[plot_pz_from_a] Failed to compute roots: {e}")
+        roots = np.array([])
+
+    # Figure
+    fig, ax = plt.subplots(figsize=(5.5, 5.5))
+
+    # Unit circle
+    theta = np.linspace(0, 2*np.pi, 512)
+    ax.plot(np.cos(theta), np.sin(theta), linestyle='--', linewidth=1.0, alpha=0.6, label='Unit circle')
+
+    # Axes lines
+    ax.axhline(0, color='k', linewidth=0.6, alpha=0.5)
+    ax.axvline(0, color='k', linewidth=0.6, alpha=0.5)
+
+    # Plot poles (x markers)
+    if roots.size > 0:
+        ax.plot(roots.real, roots.imag, 'x', markersize=7, mew=1.5, label='Poles')
+
+    # Limits and aspect
+    ax.set_aspect('equal', adjustable='box')
+    ax.set_xlim(-1.2, 1.2)
+    ax.set_ylim(-1.2, 1.2)
+
+    # Titles and grid
+    base_filename = os.path.basename(audio_path)
+    name_part = os.path.splitext(base_filename)[0]
+    # Extract duration (e.g., '50ms', '100ms') from parent folder name if present
+    folder_name = os.path.basename(os.path.dirname(audio_path))
+    match = re.search(r"_(\d+)ms", folder_name)
+    if match:
+        duration = match.group(1) + "ms"
+        title_str = f"Pole plot with unit circle\n({name_part}, order={order}, fs={fs} Hz, {duration})"
+    else:
+        title_str = f"Pole plot with unit circle\n({name_part}, order={order}, fs={fs} Hz)"
+    ax.set_title(title_str)
+    ax.set_xlabel("Real")
+    ax.set_ylabel("Imag")
+    ax.grid(True, alpha=0.3)
+    ax.legend(loc='upper right', framealpha=0.85)
+
+    # Stability hint
+    if roots.size > 0 and np.any(np.abs(roots) >= 1.0):
+        ax.text(
+            0.02, 0.02, "Warning: Unstable poles (|z| ≥ 1)",
+            transform=ax.transAxes, color='crimson',
+            bbox=dict(facecolor='white', alpha=0.8, edgecolor='crimson', linewidth=0.8)
+        )
+
+    # Save/show
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M")
+    save_name = f"pz_{name_part}_order{order}_{timestamp}.png"
+    if save:
+        if out_dir is None:
+            out_dir = "."
+        else:
+            os.makedirs(out_dir, exist_ok=True)
+        save_path = os.path.join(out_dir, save_name)
+        fig.savefig(save_path, dpi=300)
+    if show:
+        plt.show()
+    else:
+        plt.close(fig)
+
+def plot_pz(_result, save=True, show=False, out_dir=None):
+    if _result is None:
+        print("[plot_pz] No LPC result available.")
+        return
+    plot_pz_from_a(_result["a"], _result["fs"], _result["order"], _result["audio_path"], save=save, show=show, out_dir=out_dir)
+
+def plot_both_for_file(audio_path, order=DEFAULT_ORDER, save=True, show=False, out_dir=None, circle=False, pz=False):
+    res = compute_lpc(audio_path=audio_path, order=order)
+    plot_lpc_result(res, save=save, show=show, out_dir=out_dir, circle=circle)
+    if pz:
+        plot_pz_from_a(res["a"], res["fs"], res["order"], res["audio_path"], save=save, show=show, out_dir=out_dir)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="LPC analysis and plotting")
@@ -202,16 +296,34 @@ if __name__ == "__main__":
     parser.add_argument('--show', action='store_true', help="Display figures")
     parser.add_argument('--nosave', action='store_true', help="Do not save figures")
     parser.add_argument('--outdir', type=str, default=None, help="Directory to save plots into (will be created)")
+    parser.add_argument('--pz', action='store_true', help="Also generate a separate pole plot with unit circle")
     args = parser.parse_args()
 
     if args.file:
-        plot_lpc_for_file(args.file, order=args.order, save=not args.nosave, show=args.show, out_dir=args.outdir)
+        res = compute_lpc(audio_path=args.file, order=args.order)
+        plot_lpc_result(res, save=not args.nosave, show=args.show, out_dir=args.outdir)
+        if args.pz:
+            plot_pz_from_a(res["a"], res["fs"], res["order"], res["audio_path"], save=not args.nosave, show=args.show, out_dir=args.outdir)
     elif args.folder:
-        plot_lpc_for_folder(args.folder, order=args.order, save=not args.nosave, show=args.show, out_dir=args.outdir)
+        for fname in os.listdir(args.folder):
+            if fname.lower().endswith(".wav"):
+                fpath = os.path.join(args.folder, fname)
+                print(f"Processing: {fpath}")
+                try:
+                    result = compute_lpc(audio_path=fpath, order=args.order)
+                    plot_lpc_result(result, save=not args.nosave, show=args.show, out_dir=args.outdir)
+                    if args.pz:
+                        plot_pz_from_a(result["a"], result["fs"], result["order"], result["audio_path"], save=not args.nosave, show=args.show, out_dir=args.outdir)
+                except Exception as e:
+                    print(f"Error processing {fpath}: {e}")
     else:
         # fallback: plot default AUDIO_PATH with default order
         if _result is not None:
             plot_lpc_result(_result, save=not args.nosave, show=args.show, out_dir=args.outdir)
+            if args.pz:
+                plot_pz_from_a(_result["a"], _result["fs"], _result["order"], _result["audio_path"], save=not args.nosave, show=args.show, out_dir=args.outdir)
         else:
             result = compute_lpc(audio_path=AUDIO_PATH, order=DEFAULT_ORDER)
             plot_lpc_result(result, save=not args.nosave, show=args.show, out_dir=args.outdir)
+            if args.pz:
+                plot_pz_from_a(result["a"], result["fs"], result["order"], result["audio_path"], save=not args.nosave, show=args.show, out_dir=args.outdir)
