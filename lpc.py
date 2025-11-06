@@ -112,18 +112,32 @@ def plot_lpc_result(_result, save=True, show=False, out_dir=None):
     fs = _result["fs"]
     order = _result["order"]
     audio_path = _result["audio_path"]
+    F0_mean = _result["F0_mean"]
 
     plt.figure(figsize=(10, 5))
     plt.plot(freqs, Amp_dB, linewidth=1, label="Amplitude spectrum (dB)")
     plt.plot(w_hz, H_dB, linewidth=2, alpha=0.6, label="LPC response (dB)")
     for i, f in enumerate(formants[:3], 1):
-        plt.axvline(f, linestyle="--", linewidth=1)
+        plt.axvline(f, linestyle="--", linewidth=1, color="orange", alpha=0.6)
         plt.text(f, np.max(H_dB)-5-5*i, f"F{i} ≈ {f:.0f} Hz")
 
     plt.xlim(0, fs/2)
     plt.ylim(-120, 5)
-    plt.xlabel("Frequency (Hz)")
-    plt.ylabel("Magnitude (dB)")
+
+    # --- annotate mean fundamental frequency on the figure (not a plotted line) ---
+    # place it near the top-right corner within current axes limits
+    text_x = 0.82 * (fs / 2)
+    # choose a readable y slightly below the top limit
+    text_y = -10
+    plt.text(
+        text_x,
+        text_y,
+        f"Mean F0 ≈ {F0_mean:.1f} Hz",
+        ha="left",
+        va="top",
+        color="red",
+        bbox=dict(facecolor="white", alpha=0.4, edgecolor="none"),
+    )
 
     # Extract base filename
     base_filename = os.path.basename(audio_path)
@@ -201,5 +215,3 @@ if __name__ == "__main__":
         else:
             result = compute_lpc(audio_path=AUDIO_PATH, order=DEFAULT_ORDER)
             plot_lpc_result(result, save=not args.nosave, show=args.show, out_dir=args.outdir)
-
-
